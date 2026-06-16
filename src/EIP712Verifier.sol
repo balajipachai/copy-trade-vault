@@ -41,35 +41,44 @@ contract EIP712Verifier {
         returns (bool)
     {
         require(signer != address(0), "Invalid signer");
-        bytes32 finalHash = keccak256(abi.encodePacked("\x19\x01", domainSeparator, hashStruct(transfer)));
+
+        bytes32 result = hashStruct(transfer);
+        bytes32 finalHash;
+
+        assembly {
+            let ptr := mload(0x40)
+            mstore8(ptr, 0x19)
+            mstore8(add(ptr, 1), 0x01)
+            mstore(add(ptr, 2), sload(domainSeparator.slot))
+            mstore(add(ptr, 34), result)
+
+            finalHash := keccak256(ptr, 66)
+        }
+
         address originalSigner = ecrecover(finalHash, v, r, s);
         return originalSigner == signer;
     }
 
     function hashStruct(Transfer calldata transfer) internal pure returns (bytes32 result) {
-        return keccak256(abi.encode(TRANSFER_TYPEHASH, transfer.to, transfer.amount, transfer.nonce));
+        address to = transfer.to;
+        uint256 amount = transfer.amount;
+        uint256 nonce = transfer.nonce;
+
+        // Assign to a local variable first
+        // as it was causing error
+        // Error (7615): Only direct number constants and references to such constants are supported by inline assembly.
+        bytes32 transferTypeHash = TRANSFER_TYPEHASH;
+
+        assembly {
+            let ptr := mload(0x40) // get free pointer
+            mstore(ptr, transferTypeHash)
+
+            mstore(add(ptr, 32), to)
+            mstore(add(ptr, 64), amount)
+            mstore(add(ptr, 96), nonce)
+
+            result := keccak256(ptr, 128)
+        }
     }
 }
-
-/**
- *
- * Yul Assembly
- * Ran 5 tests for test/EIP712Verifier.t.sol:EIP712VerifierTest
- * [PASS] test_CrossContractReplay() (gas: 515056)
- * [PASS] test_Execute() (gas: 58740)
- * [PASS] test_RevertsWhenReplayAttackHappens() (gas: 67167)
- * [PASS] test_RevertsWhenSignatureIsInvalid() (gas: 31643)
- * [PASS] test_RevertsWhenSignerIsAddressZero() (gas: 24857)
- * Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 9.43ms (21.97ms CPU time)
- *
- *
- * Using keccak256
- * Ran 5 tests for test/EIP712Verifier.t.sol:EIP712VerifierTest
- * [PASS] test_CrossContractReplay() (gas: 563915)
- * [PASS] test_Execute() (gas: 59688)
- * [PASS] test_RevertsWhenReplayAttackHappens() (gas: 69063)
- * [PASS] test_RevertsWhenSignatureIsInvalid() (gas: 32591)
- * [PASS] test_RevertsWhenSignerIsAddressZero() (gas: 24857)
- * Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 1.67ms (4.46ms CPU time)
- */
 
