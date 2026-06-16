@@ -23,32 +23,21 @@ contract EIP712VerifierTest is Test {
     }
 
     function getDigest() public view returns (bytes32 digest, EIP712Verifier.Transfer memory transfer) {
-       // The transfer struct is built as follows
-       transfer = EIP712Verifier.Transfer({
-            to: to,
-            amount: amount,
-            nonce: currentNonce
-        });
+        // The transfer struct is built as follows
+        transfer = EIP712Verifier.Transfer({to: to, amount: amount, nonce: currentNonce});
 
         // Constructing the final digest as it is done inside the main contract
         digest = keccak256(
             abi.encodePacked(
                 "\x19\x01",
                 eip712Verifier.domainSeparator(),
-                keccak256(
-                    abi.encode(
-                        TRANSFER_TYPEHASH,
-                        transfer.to,
-                        transfer.amount,
-                        transfer.nonce
-                    )
-                )
+                keccak256(abi.encode(TRANSFER_TYPEHASH, transfer.to, transfer.amount, transfer.nonce))
             )
         );
     }
 
     function test_Execute() public {
-       (bytes32 digest, EIP712Verifier.Transfer memory transfer) = getDigest();
+        (bytes32 digest, EIP712Verifier.Transfer memory transfer) = getDigest();
 
         // Get hold of the signature components v, r and s
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
@@ -58,13 +47,7 @@ contract EIP712VerifierTest is Test {
         assertEq(eip712Verifier.nonces(signer), 0);
 
         // Call execute and assert it succeeds
-        eip712Verifier.execute(
-            signer,
-            transfer,
-            v,
-            r,
-            s
-        );
+        eip712Verifier.execute(signer, transfer, v, r, s);
 
         // After calling execute
         // nonces[signer] = 1
@@ -97,7 +80,7 @@ contract EIP712VerifierTest is Test {
         eip712Verifier.execute(
             address(0), // passing signer as the zero address
             transfer,
-            v, 
+            v,
             r,
             s
         );
@@ -112,25 +95,13 @@ contract EIP712VerifierTest is Test {
         uint256 tempNonce = eip712Verifier.nonces(signer);
         emit EIP712Verifier.Executed(signer, tempNonce);
         // Call execute and assert it reverts
-        eip712Verifier.execute(
-            signer,
-            transfer,
-            v, 
-            r,
-            s
-        );
+        eip712Verifier.execute(signer, transfer, v, r, s);
 
         // We will try replaying the same signature in that case it should fail with
         // "Invalid nonces"
         vm.expectRevert("Invalid nonces");
         // Call execute and assert it reverts
-        eip712Verifier.execute(
-            signer,
-            transfer,
-            v, 
-            r,
-            s
-        );
+        eip712Verifier.execute(signer, transfer, v, r, s);
     }
 
     function test_CrossContractReplay() public {
@@ -143,12 +114,6 @@ contract EIP712VerifierTest is Test {
 
         vm.expectRevert("Verification failed");
         // Call execute and assert it reverts
-        anotherEip712Verifier.execute(
-            signer,
-            transfer,
-            v, 
-            r,
-            s
-        );
+        anotherEip712Verifier.execute(signer, transfer, v, r, s);
     }
 }
